@@ -1,5 +1,5 @@
 
-# Open Bar (GNOME 4X Extension)  
+# Open Bar (GNOME Shell Extension)  
 
 
 A GNOME Shell extension for theming Gnome Top Bar / Top Panel, Menus, Dash/Dock, Gnome Shell and Gtk/Flatpak Apps.  
@@ -73,12 +73,10 @@ The extension's directory name should match its uuid i.e. "openbar@neuromorph"
 Note: 
 Please download from following GitHub branch as per your Gnome version:
 - For Gnome 42-44: branch 'g42-44'
-- For Gnome 45+: branch 'main'
+- For Gnome 45-50: branch 'main'
 
 You will need to restart the Gnome Shell (for manual install):
-
-- Wayland: logout and login again 
-- Xorg: `alt+f2` then type `r` and `enter` 
+Logout and login again.
 
 ## Settings Notes
 If the panel/menu isn't looking right, you need to tweak some settings. There are a lot of knobs to allow for different setups/tastes. It can also make it a bit overwhelming if you are not familiar with css styles but with some experimentation it will become a lot easier. Here are brief notes:
@@ -101,6 +99,7 @@ If the panel/menu isn't looking right, you need to tweak some settings. There ar
 
 
 ## What's New (recent first)
+- GNOME 50 support
 - Open Bar 2.0: New Auto-theming, Apply Styles to Dash/Dock, Shell and Gtk/Flatpak apps
 - Automatic FG color, Panel Box color, Light-gradient for menus and creative tweaks for border width and radius
 - Auto-theming options 
