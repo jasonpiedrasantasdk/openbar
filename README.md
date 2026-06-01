@@ -116,9 +116,11 @@ If the panel/menu isn't looking right, you need to tweak some settings. There ar
 - New overhauled version with support for menus including Calendar, Notifications, Quick Settings etc.
 - Initial version created
 
+## Credits
 
-
-## Screenshots
+- **Open Bar** — originally created by [neuromorph](https://github.com/neuromorph/openbar)
+- **GNOME 50 port** — by [jasonpiedrasantasdk](https://github.com/jasonpiedrasantasdk/openbar), with GTK4 widget patterns adapted from kongvut's [PR #171](https://github.com/neuromorph/openbar/pull/171)
+- **Assisted by** [opencode](https://opencode.ai) (big-pickle) — AI-powered coding assistance for the GNOME 50 migration, GTK4 widget updates, and null-safety audit
 
 More recent screenshots can be found in the [Reddit post here](https://www.reddit.com/r/unixporn/comments/1ethgn2/ocgnome_open_bar_for_the_rice_guys/).
 
