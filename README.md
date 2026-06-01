@@ -1,8 +1,9 @@
 
 # Open Bar (GNOME Shell Extension)  
 
-
 A GNOME Shell extension for theming Gnome Top Bar / Top Panel, Menus, Dash/Dock, Gnome Shell and Gtk/Flatpak Apps.  
+
+**Compatible with GNOME 45–50**
 
 ### Open Bar 2.0: 
 - Auto-theming completely renewed. Theme Options: Dark, Light, Pastel, True-Color
@@ -70,10 +71,8 @@ git clone https://github.com/neuromorph/openbar.git \
 OR download the code zip file and unzip at location: ~/.local/share/gnome-shell/extensions/
 The extension's directory name should match its uuid i.e. "openbar@neuromorph"
 
-Note: 
-Please download from following GitHub branch as per your Gnome version:
-- For Gnome 42-44: branch 'g42-44'
-- For Gnome 45-50: branch 'main'
+This branch supports **GNOME 45–50**.  
+For GNOME 42–44, switch to the `g42-44` branch.
 
 You will need to restart the Gnome Shell (for manual install):
 Logout and login again.
@@ -99,7 +98,12 @@ If the panel/menu isn't looking right, you need to tweak some settings. There ar
 
 
 ## What's New (recent first)
-- GNOME 50 support
+- **GNOME 50 support** — Full compatibility with GNOME Shell 50 (GJS 1.82+):
+  - GTK4 widget migration: `Gtk.ComboBoxText` → `Gtk.DropDown`, `Gtk.ColorButton` → `Gtk.ColorDialogButton`, `Gtk.FontButton` → `Gtk.FontDialogButton`, `Gtk.MessageDialog` → `Gtk.AlertDialog`, `Gtk.FileChooserDialog` → `Gtk.FileDialog`
+  - Null-safety fixes with optional chaining (?.) for objects that may be null
+  - `Gio._promisify` guarded against removal in GJS 1.82
+  - Added `use-system-accent` schema key for accent color theming
+  - (Credits: GTK4 widget patterns adapted from [kongvut's PR #171](https://github.com/neuromorph/openbar/pull/171))
 - Open Bar 2.0: New Auto-theming, Apply Styles to Dash/Dock, Shell and Gtk/Flatpak apps
 - Automatic FG color, Panel Box color, Light-gradient for menus and creative tweaks for border width and radius
 - Auto-theming options 
