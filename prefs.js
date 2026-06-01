@@ -24,6 +24,7 @@ import Gtk from 'gi://Gtk';
 import Gdk from 'gi://Gdk';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import Pango from 'gi://Pango';
 import {ExtensionPreferences, gettext as _, pgettext} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 // Retain compatibility with GLib < 2.80, which lacks GioUnix (from GSConnect extension)
@@ -82,22 +83,36 @@ class OpenbarPrefs {
         }, 400);
     }
 
-    createComboboxWidget(options, gsetting=null) {
-        let comboBox = new Gtk.ComboBoxText({halign: Gtk.Align.END});
+    createDropdownWidget(options, gsetting=null) {
+        let stringList = new Gtk.StringList();
         options.forEach(option => {
-            comboBox.append(option[0], option[1]);
+            stringList.append(option[1]);
         });
+        let dropDown = new Gtk.DropDown({
+            model: stringList,
+            halign: Gtk.Align.END,
+        });
+        dropDown._optionIds = options.map(o => o[0]);
 
         if(gsetting) {
-            this._settings.bind(
-                gsetting,
-                comboBox,
-                'active-id',
-                Gio.SettingsBindFlags.DEFAULT
-            );
+            let activeId = this._settings.get_string(gsetting);
+            let idx = options.findIndex(o => o[0] === activeId);
+            if(idx >= 0) dropDown.set_selected(idx);
+
+            dropDown.connect('notify::selected', () => {
+                let sel = dropDown.get_selected();
+                if(sel < options.length)
+                    this._settings.set_string(gsetting, options[sel][0]);
+            });
+
+            this._settings.connect(`changed::${gsetting}`, () => {
+                let activeId = this._settings.get_string(gsetting);
+                let idx = options.findIndex(o => o[0] === activeId);
+                if(idx >= 0 && idx !== dropDown.get_selected())
+                    dropDown.set_selected(idx);
+            });
         }
-        // comboBox.connect('changed', () => {this.setTimeoutStyleReload();});
-        return comboBox;
+        return dropDown;
     }
 
     hexToRGBA(hex) {
@@ -153,8 +168,8 @@ class OpenbarPrefs {
     }
 
     createColorWidget(window, title, tooltip_text="", gsetting) {
-        let color = new Gtk.ColorButton({
-            title: title,
+        let color = new Gtk.ColorDialogButton({
+            dialog: new Gtk.ColorDialog({ title: title, modal: true }),
             halign: Gtk.Align.END,
             tooltip_text: tooltip_text,
         });
@@ -167,47 +182,26 @@ class OpenbarPrefs {
         rgba.alpha = 1.0;
         color.set_rgba(rgba);
 
-        color.connect('color-set', (widget) => {
-            rgba = widget.get_rgba();
+        color.connect('notify::rgba', () => {
+            rgba = color.get_rgba();
             this._settings.set_strv(gsetting, [
                 rgba.red.toFixed(3),
                 rgba.green.toFixed(3),
                 rgba.blue.toFixed(3),
             ]);
-            // In addition to main gsetting, also copy the color to dark/light setting
             let prefix;
             let mode = this._settings.get_string('color-scheme');
             if(mode == 'prefer-dark')
                 prefix = 'dark-';
             else
                 prefix = 'light-';
-            // console.log('saving from key: ' + gsetting + ' to key: ' + `${prefix}${gsetting}`);
             this._settings.set_strv(`${prefix}${gsetting}`, [
                 rgba.red.toFixed(3),
                 rgba.green.toFixed(3),
                 rgba.blue.toFixed(3),
             ]);
-            this.triggerStyleReload();
+            this.setTimeoutStyleReload();
         });
-
-        // Update widget when setting is changed (from import file)
-        this._settings.connect(`changed::${gsetting}`, () => {
-            const colorArray = this._settings.get_strv(gsetting);
-            const rgba = color.get_rgba();
-            rgba.red = parseFloat(colorArray[0]);
-            rgba.green = parseFloat(colorArray[1]);
-            rgba.blue = parseFloat(colorArray[2]);
-            rgba.alpha = 1.0;
-            color.set_rgba(rgba);
-        });
-
-        // First call to add-palette removes existing default array so add it back first
-        let defaultArray = this.createDefaultPaletteArray();
-        let bgPaletteArray = this.createBgPaletteArray();
-        color.add_palette(Gtk.Orientation.VERTICAL, 5, defaultArray);
-        color.add_palette(Gtk.Orientation.HORIZONTAL, 6, bgPaletteArray);
-
-        window.colorButtons.push(color);
         return color;
     }
 
@@ -785,8 +779,7 @@ class OpenbarPrefs {
         });
         themeGrid.attach(darkModeLabel, 1, rownum, 1, 1);
 
-        let themeTypeDark = this.createComboboxWidget([ ["Select Theme", _("Select Theme")], ["Color", _("True Color")], ["Pastel", _("Pastel Theme")], ["Dark", _("Dark Theme")], ["Light", _("Light Theme")]]);
-        themeTypeDark.set_active_id(this._settings.get_string('autotheme-dark'));
+        let themeTypeDark = this.createDropdownWidget([ ["Select Theme", _("Select Theme")], ["Color", _("True Color")], ["Pastel", _("Pastel Theme")], ["Dark", _("Dark Theme")], ["Light", _("Light Theme")]], 'autotheme-dark');
         themeGrid.attach(themeTypeDark, 2, rownum, 1, 1);
         rownum += 1;
 
@@ -798,8 +791,7 @@ class OpenbarPrefs {
         });
         themeGrid.attach(lightModeLabel, 1, rownum, 1, 1);
 
-        let themeTypeLight = this.createComboboxWidget([ ["Select Theme", _("Select Theme")], ["Color", _("True Color")], ["Pastel", _("Pastel Theme")], ["Dark", _("Dark Theme")], ["Light", _("Light Theme")]]);
-        themeTypeLight.set_active_id(this._settings.get_string('autotheme-light'));
+        let themeTypeLight = this.createDropdownWidget([ ["Select Theme", _("Select Theme")], ["Color", _("True Color")], ["Pastel", _("Pastel Theme")], ["Dark", _("Dark Theme")], ["Light", _("Light Theme")]], 'autotheme-light');
         themeGrid.attach(themeTypeLight, 2, rownum, 1, 1);
         rownum += 1;
 
@@ -823,8 +815,8 @@ class OpenbarPrefs {
         palettegrid.attach(applyThemeErrLbl, 1, rowbar, 2, 1);
 
         applyThemeBtn.connect('clicked', () => {
-            let themeDark = themeTypeDark.get_active_id();
-            let themeLight = themeTypeLight.get_active_id();
+            let themeDark = themeTypeDark._optionIds[themeTypeDark.get_selected()];
+            let themeLight = themeTypeLight._optionIds[themeTypeLight.get_selected()];
             if(themeDark == 'Select Theme' && themeLight == 'Select Theme') {
                 applyThemeErrLbl.label = `<span color="#ff8c00">Please select desired themes to apply.</span>`;
                 applyThemeErrLbl.sensitive = true;
@@ -933,7 +925,7 @@ class OpenbarPrefs {
         });
         bargrid.attach(barTypeLbl, 1, rowbar, 1, 1);
 
-        let barType = this.createComboboxWidget([ ["Mainland", _("Mainland")], ["Floating", _("Floating")], ["Trilands", _("Trilands")], ["Islands", _("Islands")]], 'bartype');
+        let barType = this.createDropdownWidget([ ["Mainland", _("Mainland")], ["Floating", _("Floating")], ["Trilands", _("Trilands")], ["Islands", _("Islands")]], 'bartype');
         bargrid.attach(barType, 2, rowbar, 1, 1);
 
         rowbar += 1;
@@ -945,7 +937,7 @@ class OpenbarPrefs {
         });
         bargrid.attach(barPosLbl, 1, rowbar, 1, 1);
 
-        let barPos = this.createComboboxWidget([ ["Top", _("Top")], ["Bottom", _("Bottom")] ], 'position');
+        let barPos = this.createDropdownWidget([ ["Top", _("Top")], ["Bottom", _("Bottom")] ], 'position');
         bargrid.attach(barPos, 2, rowbar, 1, 1);
 
         rowbar += 1;
@@ -1257,33 +1249,32 @@ class OpenbarPrefs {
         });
         fggrid.attach(fontLabel, 1, rowbar, 1, 1);
 
-        const fontBtn = new Gtk.FontButton({
-            use_font: true,
+        const fontBtn = new Gtk.FontDialogButton({
+            dialog: new Gtk.FontDialog(),
             tooltip_text: _("Font for Panel text"),
             valign: Gtk.Align.CENTER,
             hexpand: true,
         });
         let font = this._settings.get_string('font');
         if (font == ""){
-            let defaultFont = fontBtn.get_font();
+            let defaultFont = fontBtn.get_font_desc().to_string();
             this._settings.set_string('default-font', defaultFont);
             font = defaultFont;
         }
-        fontBtn.set_font(font);
+        fontBtn.set_font_desc(Pango.FontDescription.from_string(font));
         let obar = this;
         fontBtn.connect(
-            "font-set",
+            "notify::font-desc",
             function (w) {
-                var value = w.get_font();
+                var value = w.get_font_desc().to_string();
                 obar._settings.set_string('font', value);
-                // obar.triggerStyleReload();
             }
         );
 
         // Update font widget when font changed from settings (due to import file)
         this._settings.connect('changed::font', () => {
             let font = obar._settings.get_string('font');
-            fontBtn.set_font(font);
+            fontBtn.set_font_desc(Pango.FontDescription.from_string(font));
         });
 
         fggrid.attach(fontBtn, 2, rowbar, 1, 1);
@@ -1295,11 +1286,10 @@ class OpenbarPrefs {
             valign: Gtk.Align.CENTER,
             halign: Gtk.Align.END
         });
-        resetFontBtn.get_style_context().add_class('circular');
+        resetFontBtn.add_css_class('circular');
         resetFontBtn.connect('clicked', () => {
             obar._settings.reset('font');
-            fontBtn.set_font(obar._settings.get_string('default-font'));
-            // obar.triggerStyleReload();
+            fontBtn.set_font_desc(Pango.FontDescription.from_string(obar._settings.get_string('default-font')));
         });
         fggrid.attach(resetFontBtn, 3, rowbar, 1, 1);
 
@@ -1450,7 +1440,7 @@ class OpenbarPrefs {
         });
         bggrid.attach(grDirecLbl, 1, rowbar, 1, 1);
 
-        let grDirection = this.createComboboxWidget([["horizontal", _("Horizontal")], ["vertical", _("Vertical")]], 'gradient-direction');
+        let grDirection = this.createDropdownWidget([["horizontal", _("Horizontal")], ["vertical", _("Vertical")]], 'gradient-direction');
         bggrid.attach(grDirection, 2, rowbar, 1, 1);
 
         rowbar += 1;
@@ -2132,7 +2122,7 @@ class OpenbarPrefs {
         });
         dashgrid.attach(applyDashLbl, 1, rowbar, 1, 1);
 
-        let applyDashCombo = this.createComboboxWidget([ ["Default", _("Keep Default Theme")], ["Menu", _("Use Menu Colors")], ["Bar", _("Use Top Bar Colors")], ["Custom", _("Custom Colors (as below)")] ], 'dashdock-style');
+        let applyDashCombo = this.createDropdownWidget([ ["Default", _("Keep Default Theme")], ["Menu", _("Use Menu Colors")], ["Bar", _("Use Top Bar Colors")], ["Custom", _("Custom Colors (as below)")] ], 'dashdock-style');
         dashgrid.attach(applyDashCombo, 2, rowbar, 1, 1);
 
         rowbar += 1;
@@ -2388,7 +2378,7 @@ class OpenbarPrefs {
         });
         appgrid.attach(sbGradComboLbl, 1, rowbar, 1, 1);
 
-        let sbGradCombo = this.createComboboxWidget([ ["none", _("None")], ["to right", _("To Right")], ["to left", _("To Left")], ["to bottom", _("To Bottom")], ["to bottom right", _("To Bottom Right")], ["to bottom left", _("To Bottom Left")]] ,'sbar-gradient');
+        let sbGradCombo = this.createDropdownWidget([ ["none", _("None")], ["to right", _("To Right")], ["to left", _("To Left")], ["to bottom", _("To Bottom")], ["to bottom right", _("To Bottom Right")], ["to bottom left", _("To Bottom Left")]] ,'sbar-gradient');
         appgrid.attach(sbGradCombo, 2, rowbar, 1, 1);
 
         rowbar += 1;
@@ -2568,7 +2558,7 @@ class OpenbarPrefs {
         });
         appgrid.attach(wShadowComboLbl, 1, rowbar, 1, 1);
 
-        let wShadowCombo = this.createComboboxWidget([ ["Default", _("Default")], ["Floating", _("Float - Bottom Right")], ["None", _("None")] ] ,'gtk-shadow');
+        let wShadowCombo = this.createDropdownWidget([ ["Default", _("Default")], ["Floating", _("Float - Bottom Right")], ["None", _("None")] ] ,'gtk-shadow');
         appgrid.attach(wShadowCombo, 2, rowbar, 1, 1);
 
         rowbar += 1
@@ -2860,29 +2850,26 @@ class OpenbarPrefs {
     }
 
     resetSettingsDialog(window){
-        let dialog = new Gtk.MessageDialog({
-          modal: true,
-          text: _("Reset Open Bar settings?"),
-          secondary_text: _("This will reset all the Open Bar settings to their default values. If needed, you can save the current settings by exporting them to a file before you reset."),
-          transient_for: window,
+        let alertDialog = new Gtk.AlertDialog({
+            modal: true,
+            message: _("Reset Open Bar settings?"),
+            detail: _("This will reset all the Open Bar settings to their default values. If needed, you can save the current settings by exporting them to a file before you reset."),
+            buttons: [_("Cancel"), _("Reset")],
+            cancel_button: 0,
+            default_button: 0,
         });
-        // add buttons to dialog as 'Delete' and 'Cancel' with 'Cancel' as default
-        dialog.add_button(_("Cancel"), Gtk.ResponseType.CANCEL);
-        dialog.add_button(_("Reset"), Gtk.ResponseType.YES);
-        dialog.set_default_response(Gtk.ResponseType.CANCEL);
-
-        dialog.connect("response", (dialog, responseId) => {
-          if (responseId == Gtk.ResponseType.YES) {
-            this._settings.set_boolean('import-export', true);
-            let keys = this._settings.list_keys();
-            let keysToKeep = ['import-export', 'default-font', 'bguri', 'dark-bguri', 'light-bguri'];
-            keys.forEach(k => { if(!keysToKeep.includes(k)) this._settings.reset(k); });
-            this._settings.set_boolean('import-export', false);
-          }
-          dialog.destroy();
+        alertDialog.choose(window, null, (dialog, task) => {
+            try {
+                let response = dialog.choose_finish(task);
+                if (response === 1) {
+                    this._settings.set_boolean('import-export', true);
+                    let keys = this._settings.list_keys();
+                    let keysToKeep = ['import-export', 'default-font', 'bguri', 'dark-bguri', 'light-bguri'];
+                    keys.forEach(k => { if(!keysToKeep.includes(k)) this._settings.reset(k); });
+                    this._settings.set_boolean('import-export', false);
+                }
+            } catch(e) {}
         });
-
-        dialog.show();
     }
 
     setQuoteLabel(quoteLabel) {
@@ -2929,96 +2916,72 @@ class OpenbarPrefs {
     }
 
     importSettings(window) {
-        let fileChooser = new Gtk.FileChooserDialog({
+        let fileDialog = new Gtk.FileDialog({
             title: _("Import Settings for Open Bar Theme"),
-            action: Gtk.FileChooserAction.OPEN,
-            transient_for: window,
         });
-        fileChooser.add_button(_("Cancel"), Gtk.ResponseType.CANCEL);
-        fileChooser.add_button(_("Open"), Gtk.ResponseType.ACCEPT);
+        fileDialog.open(window, null, (dialog, task) => {
+            try {
+                let file = dialog.open_finish(task);
+                let filePath = file.get_path();
+                if (filePath && GLib.file_test(filePath, GLib.FileTest.EXISTS)) {
+                    this._settings.set_boolean('import-export', true);
+                    let bguri = this._settings.get_string('bguri');
+                    let darkBguri = this._settings.get_string('dark-bguri');
+                    let lightBguri = this._settings.get_string('light-bguri');
 
-        fileChooser.connect('response', (self, response) => {
-          if (response == Gtk.ResponseType.ACCEPT) {
-            this._settings.set_boolean('import-export', true);
-            // Save current BG URIs since the one in imported file maybe invalid
-            let bguri = this._settings.get_string('bguri');
-            let darkBguri =  this._settings.get_string('dark-bguri');
-            let lightBguri = this._settings.get_string('light-bguri');
+                    let importFile = Gio.File.new_for_path(filePath);
+                    let [success_, pid_, stdin, stdout, stderr] =
+                        GLib.spawn_async_with_pipes(
+                            null,
+                            ['dconf', 'load', SCHEMA_PATH],
+                            null,
+                            GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+                            null
+                        );
 
-            // Load settings from file
-            let filePath = fileChooser.get_file().get_path();
-            if (filePath && GLib.file_test(filePath, GLib.FileTest.EXISTS)) {
-                let file = Gio.File.new_for_path(filePath);
+                    stdin = new GioUnix.OutputStream({fd: stdin, close_fd: true});
+                    GLib.close(stdout);
+                    GLib.close(stderr);
 
-                let [success_, pid_, stdin, stdout, stderr] =
-                    GLib.spawn_async_with_pipes(
-                        null,
-                        ['dconf', 'load', SCHEMA_PATH],
-                        null,
-                        GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
-                        null
-                    );
+                    stdin.splice(importFile.read(null),
+                        Gio.OutputStreamSpliceFlags.CLOSE_SOURCE | Gio.OutputStreamSpliceFlags.CLOSE_TARGET, null);
 
-                stdin = new GioUnix.OutputStream({fd: stdin, close_fd: true});
-                GLib.close(stdout);
-                GLib.close(stderr);
-
-                stdin.splice(file.read(null),
-                    Gio.OutputStreamSpliceFlags.CLOSE_SOURCE | Gio.OutputStreamSpliceFlags.CLOSE_TARGET, null);
-
-                setTimeout(() => {
-                    // Replace BG URIs with saved URIs
-                    this._settings.set_string('bguri', bguri);
-                    this._settings.set_string('dark-bguri', darkBguri);
-                    this._settings.set_string('light-bguri', lightBguri);
-
-                    // Disable import/export pause to enable style reload
-                    this._settings.set_boolean('import-export', false);
-
-                    // Trigger stylesheet reload to apply new settings
-                    this.triggerStyleReload();
-                }, 3000);
-
-            }
-          }
-          fileChooser.destroy();
+                    setTimeout(() => {
+                        this._settings.set_string('bguri', bguri);
+                        this._settings.set_string('dark-bguri', darkBguri);
+                        this._settings.set_string('light-bguri', lightBguri);
+                        this._settings.set_boolean('import-export', false);
+                        this.triggerStyleReload();
+                    }, 3000);
+                }
+            } catch(e) {}
         });
-
-        fileChooser.show();
     }
 
     exportSettings(window) {
-        let fileChooser = new Gtk.FileChooserDialog({
+        let fileDialog = new Gtk.FileDialog({
             title: _("Export Settings for Open Bar Theme"),
-            action: Gtk.FileChooserAction.SAVE,
-            transient_for: window,
         });
-        fileChooser.add_button(_("Cancel"), Gtk.ResponseType.CANCEL);
-        fileChooser.add_button(_("Save"), Gtk.ResponseType.ACCEPT);
+        fileDialog.save(window, null, (dialog, task) => {
+            try {
+                let file = dialog.save_finish(task);
+                let filePath = file.get_path();
+                this._settings.set_boolean('import-export', true);
+                const exportFile = Gio.File.new_for_path(filePath);
+                const raw = exportFile.replace(null, false, Gio.FileCreateFlags.NONE, null);
+                const out = Gio.BufferedOutputStream.new_sized(raw, 4096);
 
-        fileChooser.connect('response', (self, response) => {
-          if (response == Gtk.ResponseType.ACCEPT) {
-            this._settings.set_boolean('import-export', true);
-            let filePath = fileChooser.get_file().get_path();
-            const file = Gio.file_new_for_path(filePath);
-            const raw = file.replace(null, false, Gio.FileCreateFlags.NONE, null);
-            const out = Gio.BufferedOutputStream.new_sized(raw, 4096);
+                let keys = this._settings.list_keys();
+                keys.forEach(k => {
+                    let value = this._settings.get_value(k);
+                    this._settings.set_value(k, value);
+                });
 
-            // Settings not updated by user (default) aren't caught by dconf, so force update
-            let keys = this._settings.list_keys();
-            keys.forEach(k => {
-                let value = this._settings.get_value(k);
-                this._settings.set_value(k, value);
-            });
-
-            out.write_all(GLib.spawn_command_line_sync(`dconf dump ${SCHEMA_PATH}`)[1], null);
-            out.close(null);
-            setTimeout(() => {this._settings.set_boolean('import-export', false)}, 1000);
-          }
-          fileChooser.destroy();
+                out.write_all(GLib.spawn_command_line_sync(`dconf dump ${SCHEMA_PATH}`)[1], null);
+                out.close(null);
+                setTimeout(() => {this._settings.set_boolean('import-export', false)}, 1000);
+            } catch(e) {}
         });
-
-        fileChooser.show();
     }
 
 }

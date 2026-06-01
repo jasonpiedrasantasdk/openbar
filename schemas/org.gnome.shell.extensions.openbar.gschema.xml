@@ -392,6 +392,11 @@
       <summary>Menu selection Color (RGBA)</summary>
       <description>Selection color of Top Bar menus.</description>
     </key>
+    <key type="b" name="use-system-accent">
+      <default>false</default>
+      <summary>Use system accent color</summary>
+      <description>Use the system accent color instead of overriding it.</description>
+    </key>
     <key type="d" name="msalpha">
       <default>0.85</default>
       <summary>Transparency (alpha) Menu selection</summary>
