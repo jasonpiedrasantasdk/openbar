@@ -53,29 +53,21 @@ etc.
 
 ## Installation
 
-### Recommended
+> **Note:** This is a fork of [neuromorph/openbar](https://github.com/neuromorph/openbar) with GNOME 50 compatibility additions. It is not published on extensions.gnome.org. Once the upstream maintainer reviews and merges the PR, you can install from EGO directly. Until then, install via GitHub only.
 
-[<img alt="" height="100" src="https://raw.githubusercontent.com/andyholmes/gnome-shell-extensions-badge/master/get-it-on-ego.svg?sanitize=true">](https://extensions.gnome.org/extension/6580/open-bar/)
-
-It's recommended to install the extension from
-[extensions website](https://extensions.gnome.org/extension/6580/open-bar/), or from
-the _Extension Manager_ app.
-
-
-### How to manually install the extension (if needed)?
+### How to manually install the extension
 
 ```
-git clone https://github.com/neuromorph/openbar.git \
+git clone git@github.com:jasonpiedrasantasdk/openbar.git \
 	~/.local/share/gnome-shell/extensions/openbar@neuromorph
 ```
-OR download the code zip file and unzip at location: ~/.local/share/gnome-shell/extensions/
-The extension's directory name should match its uuid i.e. "openbar@neuromorph"
 
 This branch supports **GNOME 45–50**.  
-For GNOME 42–44, switch to the `g42-44` branch.
+For GNOME 42–44, switch to the upstream `g42-44` branch.
 
 You will need to restart the Gnome Shell (for manual install):
-Logout and login again.
+Logout and login again. You can also download a zip of this fork from
+[github.com/jasonpiedrasantasdk/openbar](https://github.com/jasonpiedrasantasdk/openbar).
 
 ## Settings Notes
 If the panel/menu isn't looking right, you need to tweak some settings. There are a lot of knobs to allow for different setups/tastes. It can also make it a bit overwhelming if you are not familiar with css styles but with some experimentation it will become a lot easier. Here are brief notes:
